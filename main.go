@@ -48,7 +48,6 @@ var version = "0.0.1"
 
 var (
 	configFlag  = flag.String("config", "config.json", "Location of the configuration file")
-	logFlag     = flag.String("log", "elastichoney.log", "Location of the log file")
 	verboseFlag = flag.Bool("verbose", false, "Output verbose logging to STDOUT")
 )
 
@@ -278,7 +277,7 @@ func LogRequest(w http.ResponseWriter, r *http.Request, t string) {
 	err = json.Compact(as_c, as)
 	fmt.Printf("%s\n", as)
 	// Log the entry
-	f, err := os.OpenFile(*logFlag, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0660)
+	f, err := os.OpenFile(Conf.LogFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0660)
 	if err != nil {
 		logger.Printf("[!] ERROR: %s\n", err)
 	} else {

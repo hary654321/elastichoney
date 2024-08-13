@@ -1,0 +1,19 @@
+version: '2.3'
+
+services:
+
+
+  redishoneypot:
+    container_name: es
+    restart: always
+    network_mode: "host"
+    image: "hary654321/es"
+    read_only: true
+    volumes:
+     - $PWD/data/es/log:/var/log/es
+    environment:
+      HP_PORT: "1234"
+      LOGIN_PWD: "elastic"
+      LOGIN_NAME: "elastic"
+
+
