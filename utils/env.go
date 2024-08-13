@@ -1,0 +1,112 @@
+/*
+ * @Description:
+ * @Version: 2.0
+ * @Autor: ABing
+ * @Date: 2024-07-30 17:09:43
+ * @LastEditors: lhl
+ * @LastEditTime: 2024-08-13 11:33:17
+ */
+package utils
+
+import (
+	"log"
+	"net"
+	"os"
+	"strconv"
+)
+
+func GetHpName() string {
+
+	home := os.Getenv("HP_NAME")
+	if home == "" {
+		return "mysql"
+	}
+
+	return home
+
+}
+
+func GetHpPort() int {
+
+	home := os.Getenv("HP_PORT")
+	if home == "" {
+		return 9200
+	}
+
+	num, _ := strconv.Atoi(home)
+	return num
+
+}
+
+func GetHpPortStr() string {
+
+	home := os.Getenv("HP_PORT")
+	if home == "" {
+		return "9200"
+	}
+
+	return home
+
+}
+
+func GetHpLogPath() string {
+
+	home := os.Getenv("HP_LOG_PATH")
+
+	log.Println("lllllllll", home)
+
+	if home == "" {
+		return "./log/mysql.json"
+	}
+
+	return home
+
+}
+
+func GetLoginName() string {
+
+	home := os.Getenv("LOGIN_NAME")
+	if home == "" {
+		return "root"
+	}
+
+	return home
+
+}
+
+func GetLoginPwd() string {
+
+	home := os.Getenv("LOGIN_PWD")
+	if home == "" {
+		return "root"
+	}
+
+	return home
+
+}
+
+func GetIp() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		panic(err)
+	}
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		default:
+			continue
+		}
+		if ip.IsLoopback() || ip.To4() == nil {
+			// 跳过回环地址和非IPv4地址
+			continue
+		}
+		return ip.String()
+
+	}
+
+	return ""
+}

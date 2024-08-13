@@ -1,12 +1,12 @@
 {
-    "logfile" : "./elastichoney.log",
-    "use_remote" : false,
-    "remote" : {
-        "url" : "http://example.com",
-        "use_auth" : false,
-        "auth" : {
-            "username" : "",
-            "password" : ""
+    "logfile": "./elastichoney.log",
+    "use_remote": false,
+    "remote": {
+        "url": "http://example.com",
+        "use_auth": false,
+        "auth": {
+            "username": "elastic",
+            "password": "elastic"
         }
     },
     "hpfeeds": {
@@ -17,8 +17,8 @@
         "secret": "elastichoney",
         "channel": "elastichoney.events"
     },
-    "instance_name" : "Green Goblin",
-    "anonymous" : false,
-    "spoofed_version"  : "1.4.1",
+    "instance_name": "Green Goblin",
+    "anonymous": false,
+    "spoofed_version": "1.4.1",
     "public_ip_url": "http://queryip.net/ip/"
 }

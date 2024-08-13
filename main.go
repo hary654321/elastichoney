@@ -29,6 +29,7 @@ THE SOFTWARE.
 import (
 	"bytes"
 	"encoding/json"
+	"es/utils"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -36,8 +37,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
 	"github.com/fw42/go-hpfeeds"
 )
 
@@ -94,15 +97,21 @@ var Conf Config
 
 // Attack is a struct that contains the details of an attack entry
 type Attack struct {
-	SourceIP  string    `json:"source"`
-	Timestamp time.Time `json:"@timestamp"`
-	URL       string    `json:"url"`
-	Method    string    `json:"method"`
-	Form      string    `json:"form"`
-	Payload   string    `json:"payload"`
-	Headers   Headers   `json:"headers"`
-	Type      string    `json:"type"`
-	SensorIP  string    `json:"honeypot"`
+	SourceIP  string  `json:"src_ip"`
+	SrcPort   int     `json:"src_port,omitempty"`
+	Timestamp int64   `json:"timestamp"`
+	URL       string  `json:"url"`
+	Method    string  `json:"method"`
+	Form      string  `json:"form"`
+	Payload   string  `json:"payload"`
+	Headers   Headers `json:"headers"`
+	Type      string  `json:"type"`
+	DestIP    string  `json:"dest_ip,omitempty"`
+	DestPort  int     `json:"dest_port,omitempty"`
+	Protocol  string  `json:"protocol"`
+	App       string  `json:"app"`
+	Name      string  `json:"name"`
+	UUID      string  `json:"UUID"`
 }
 
 // Headers contains the filtered headers of the HTTP request
@@ -117,7 +126,7 @@ type Headers struct {
 // TODO: Change Name to be randomly generated from real elasticsearch choices
 // Make sure to keep name consistent for the same remote IP
 func FakeBanner(w http.ResponseWriter, r *http.Request) {
-	LogRequest(r, "recon")
+
 	response := fmt.Sprintf(`{
         "status" : 200,
         "name" : "%s",
@@ -131,13 +140,14 @@ func FakeBanner(w http.ResponseWriter, r *http.Request) {
         "tagline" : "You Know, for Search"
     }`, Conf.InstanceName, Conf.SpoofedVersion)
 	WriteResponse(w, response)
+	LogRequest(w, r, "scan")
 	return
 }
 
 // FakeNodes presents a fake /_nodes result
 // TODO: Change IP Address with actual server IP address
 func FakeNodes(w http.ResponseWriter, r *http.Request) {
-	LogRequest(r, "recon")
+
 	response := fmt.Sprintf(`
 	{
         "cluster_name" : "elasticsearch",
@@ -189,12 +199,12 @@ func FakeNodes(w http.ResponseWriter, r *http.Request) {
             }
         }`, Conf.InstanceName, Conf.SensorIP, Conf.SpoofedVersion, Conf.SensorIP, Conf.SensorIP, Conf.SensorIP, Conf.SensorIP)
 	WriteResponse(w, response)
+	LogRequest(w, r, "scan")
 	return
 }
 
 // FakeSearch returns fake search results
 func FakeSearch(w http.ResponseWriter, r *http.Request) {
-	LogRequest(r, "attack")
 	response := fmt.Sprintf(`
 	{
         "took" : 6,
@@ -217,25 +227,31 @@ func FakeSearch(w http.ResponseWriter, r *http.Request) {
         }
     }`)
 	WriteResponse(w, response)
+	LogRequest(w, r, "scan")
 	return
 }
 
 // LogRequest handles the logging of requests to configurable endpoints
-func LogRequest(r *http.Request, t string) {
+func LogRequest(w http.ResponseWriter, r *http.Request, t string) {
+
 	as_c := new(bytes.Buffer)
 	r.ParseForm()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		logger.Printf("[!] Error: %s\n", err)
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		logger.Printf("[!] Error: %s\n", err)
-	}
+
+	clientIP, clientPort, _ := net.SplitHostPort(r.RemoteAddr)
+	portInt, _ := strconv.Atoi(clientPort)
+
 	// Create the attack entry
+	currentTime := time.Now()
+	milliseconds := currentTime.UnixNano() / int64(time.Millisecond)
+
 	attack := Attack{
-		Timestamp: time.Now(),
-		SourceIP:  ip,
+		Timestamp: milliseconds,
+		SourceIP:  clientIP,
+		SrcPort:   portInt,
 		Method:    r.Method,
 		URL:       strings.Join([]string{r.Host, r.URL.String()}, ""),
 		Form:      r.Form.Encode(),
@@ -246,8 +262,13 @@ func LogRequest(r *http.Request, t string) {
 			ContentType:    r.Header.Get("Content-Type"),
 			AcceptLanguage: r.Header.Get("Accept-Language"),
 		},
-		SensorIP: Conf.SensorIP,
+		DestIP:   utils.GetIp(),
+		DestPort: utils.GetHpPort(),
 		Type:     t,
+		Name:     "Elastichoney",
+		App:      "Elastichoney",
+		Protocol: "http",
+		UUID:     "<UUID>",
 	}
 	// Convert to JSON
 	as, err := JSONMarshal(attack)
@@ -339,7 +360,6 @@ func hpfeedsConnect() {
 	}
 }
 
-
 func main() {
 	flag.Parse()
 	// Get the config file
@@ -350,20 +370,7 @@ func main() {
 	json.Unmarshal(configFile, &Conf)
 	// If the user doesn't want their honeypot IP to be anonymous, let's get
 	// the external IP
-	if !Conf.Anonymous {
-		resp, err := http.Get(Conf.PublicIpUrl)
-		if err != nil {
-			panic(err)
-		}
-		ip, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			panic(err)
-		}
-		Conf.SensorIP = strings.TrimSpace(string(ip))
-		resp.Body.Close()
-	} else {
-		Conf.SensorIP = "1.1.1.1"
-	}
+
 	if *verboseFlag {
 		logger.Printf("Using sensor ip: %s", Conf.SensorIP)
 	}
@@ -377,8 +384,8 @@ func main() {
 	http.HandleFunc("/_nodes", FakeNodes)
 	http.HandleFunc("/_search", FakeSearch)
 	if *verboseFlag {
-		logger.Printf("Listening on :9200")
+		logger.Printf("Listening on :" + utils.GetHpPortStr())
 	}
 	// Start the server
-	http.ListenAndServe(":9200", nil)
+	http.ListenAndServe(":"+utils.GetHpPortStr(), nil)
 }
